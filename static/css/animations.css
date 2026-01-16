@@ -1,0 +1,336 @@
+/*
+ * Animation Effects for Access Control System
+ */
+
+/* Pulse Animation for Status Icons */
+@keyframes pulse {
+    0%, 100% {
+        transform: scale(1);
+        opacity: 1;
+    }
+    50% {
+        transform: scale(1.15);
+        opacity: 0.8;
+    }
+}
+
+.pulse-animation {
+    animation: pulse 1.5s ease-in-out infinite;
+}
+
+/* Glow Effect for Body Parts */
+@keyframes glow-green {
+    0%, 100% {
+        filter: drop-shadow(0 0 5px #10B981);
+    }
+    50% {
+        filter: drop-shadow(0 0 15px #10B981);
+    }
+}
+
+@keyframes glow-red {
+    0%, 100% {
+        filter: drop-shadow(0 0 5px #EF4444);
+    }
+    50% {
+        filter: drop-shadow(0 0 15px #EF4444);
+    }
+}
+
+.glow-green {
+    animation: glow-green 2s ease-in-out infinite;
+}
+
+.glow-red {
+    animation: glow-red 1s ease-in-out infinite;
+}
+
+/* Shake Animation for Denied Access */
+@keyframes shake {
+    0%, 100% { transform: translateX(0); }
+    10%, 30%, 50%, 70%, 90% { transform: translateX(-10px); }
+    20%, 40%, 60%, 80% { transform: translateX(10px); }
+}
+
+.shake-animation {
+    animation: shake 0.5s;
+}
+
+/* Slide In from Bottom */
+@keyframes slideInUp {
+    from {
+        transform: translateY(100%);
+        opacity: 0;
+    }
+    to {
+        transform: translateY(0);
+        opacity: 1;
+    }
+}
+
+.slide-in-up {
+    animation: slideInUp 0.6s ease-out;
+}
+
+/* Slide Out to Bottom */
+@keyframes slideOutDown {
+    from {
+        transform: translateY(0);
+        opacity: 1;
+    }
+    to {
+        transform: translateY(100%);
+        opacity: 0;
+    }
+}
+
+.slide-out-down {
+    animation: slideOutDown 0.4s ease-in;
+}
+
+/* Fade In */
+@keyframes fadeIn {
+    from {
+        opacity: 0;
+    }
+    to {
+        opacity: 1;
+    }
+}
+
+.fade-in {
+    animation: fadeIn 0.5s ease-out;
+}
+
+/* Fade Out */
+@keyframes fadeOut {
+    from {
+        opacity: 1;
+    }
+    to {
+        opacity: 0;
+    }
+}
+
+.fade-out {
+    animation: fadeOut 0.3s ease-out;
+}
+
+/* Scale In (Grow) */
+@keyframes scaleIn {
+    from {
+        transform: scale(0);
+        opacity: 0;
+    }
+    to {
+        transform: scale(1);
+        opacity: 1;
+    }
+}
+
+.scale-in {
+    animation: scaleIn 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+}
+
+/* Bounce */
+@keyframes bounce {
+    0%, 100% {
+        transform: translateY(0);
+    }
+    50% {
+        transform: translateY(-20px);
+    }
+}
+
+.bounce-animation {
+    animation: bounce 0.6s ease-in-out;
+}
+
+/* Rotate */
+@keyframes rotate {
+    from {
+        transform: rotate(0deg);
+    }
+    to {
+        transform: rotate(360deg);
+    }
+}
+
+.rotate-animation {
+    animation: rotate 1s linear infinite;
+}
+
+/* Flash Background */
+@keyframes flash-green {
+    0%, 100% {
+        background-color: inherit;
+    }
+    50% {
+        background-color: rgba(16, 185, 129, 0.3);
+    }
+}
+
+@keyframes flash-red {
+    0%, 100% {
+        background-color: inherit;
+    }
+    50% {
+        background-color: rgba(239, 68, 68, 0.3);
+    }
+}
+
+.flash-green {
+    animation: flash-green 0.5s ease-in-out 3;
+}
+
+.flash-red {
+    animation: flash-red 0.5s ease-in-out 3;
+}
+
+/* Success Checkmark Animation */
+@keyframes draw-check {
+    0% {
+        stroke-dashoffset: 100;
+    }
+    100% {
+        stroke-dashoffset: 0;
+    }
+}
+
+.check-animation {
+    stroke-dasharray: 100;
+    stroke-dashoffset: 100;
+    animation: draw-check 0.6s ease-out forwards;
+}
+
+/* Ripple Effect */
+@keyframes ripple {
+    0% {
+        transform: scale(0);
+        opacity: 1;
+    }
+    100% {
+        transform: scale(4);
+        opacity: 0;
+    }
+}
+
+.ripple-effect {
+    position: relative;
+    overflow: hidden;
+}
+
+.ripple-effect::after {
+    content: '';
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    width: 100px;
+    height: 100px;
+    margin: -50px 0 0 -50px;
+    background: rgba(255, 255, 255, 0.5);
+    border-radius: 50%;
+    animation: ripple 1s ease-out;
+}
+
+/* Progress Bar Fill Animation */
+@keyframes progressFill {
+    from {
+        width: 0%;
+    }
+    to {
+        width: 100%;
+    }
+}
+
+.progress-fill-animation {
+    animation: progressFill 3s linear;
+}
+
+/* Blink Animation */
+@keyframes blink {
+    0%, 100% {
+        opacity: 1;
+    }
+    50% {
+        opacity: 0;
+    }
+}
+
+.blink-animation {
+    animation: blink 1s ease-in-out infinite;
+}
+
+/* Attention Seeker */
+@keyframes attention {
+    0% {
+        transform: scale(1);
+    }
+    10%, 20% {
+        transform: scale(0.9) rotate(-3deg);
+    }
+    30%, 50%, 70%, 90% {
+        transform: scale(1.1) rotate(3deg);
+    }
+    40%, 60%, 80% {
+        transform: scale(1.1) rotate(-3deg);
+    }
+    100% {
+        transform: scale(1) rotate(0);
+    }
+}
+
+.attention-animation {
+    animation: attention 1s ease-in-out;
+}
+
+/* SVG Body Part Transition */
+.body-part-transition {
+    transition: fill 0.5s ease, filter 0.5s ease, transform 0.3s ease;
+}
+
+.body-part-transition:hover {
+    transform: scale(1.05);
+}
+
+/* Status Section Transitions */
+.access-status-section {
+    transition: background 0.6s ease, transform 0.3s ease;
+}
+
+/* Particle Effect (for success) */
+@keyframes particle-float {
+    0% {
+        transform: translateY(0) scale(1);
+        opacity: 1;
+    }
+    100% {
+        transform: translateY(-100px) scale(0);
+        opacity: 0;
+    }
+}
+
+.particle {
+    position: absolute;
+    width: 10px;
+    height: 10px;
+    background: white;
+    border-radius: 50%;
+    animation: particle-float 1.5s ease-out forwards;
+}
+
+/* Smooth Color Transitions for Body Parts */
+svg g {
+    transition: all 0.4s ease-in-out;
+}
+
+svg g ellipse,
+svg g circle,
+svg g path,
+svg g rect,
+svg g line {
+    transition: fill 0.4s ease, stroke 0.4s ease;
+}
+
+
+

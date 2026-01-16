@@ -1,0 +1,309 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>HKPC Access Control</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/modern_access.css') }}">
+</head>
+<body>
+    <!-- 全屏视频 -->
+    <div class="video-container">
+        <img id="video-stream" src="{{ url_for('video_feed') }}" alt="Camera Feed">
+    </div>
+    
+    <!-- 顶部状态栏 -->
+    <div class="top-bar">
+        <img src="{{ url_for('static', filename='images/logo-hkpc.png') }}" alt="HKPC" class="logo">
+        <span class="system-title">Access Control System</span>
+    </div>
+    
+    <!-- 隐藏管理按钮（右上角） -->
+    <button class="admin-btn" onclick="window.location.href='/admin/login'" title="Admin Panel">⚙️</button>
+    
+    <!-- 迷你PPE指示器 -->
+    <div class="ppe-indicator">
+        <svg class="ppe-mini-icon" viewBox="0 0 100 200" id="mini-body-svg">
+            <!-- 超简化人体 -->
+            <circle id="mini-head" cx="50" cy="20" r="15" fill="#666" stroke="#333" stroke-width="2"/>
+            <rect id="mini-body" x="35" y="35" width="30" height="50" rx="5" fill="#666" stroke="#333" stroke-width="2"/>
+            <circle id="mini-hand-l" cx="25" cy="60" r="8" fill="#666" stroke="#333" stroke-width="2"/>
+            <circle id="mini-hand-r" cx="75" cy="60" r="8" fill="#666" stroke="#333" stroke-width="2"/>
+            <rect id="mini-leg-l" x="38" y="85" width="10" height="30" rx="3" fill="#666" stroke="#333" stroke-width="2"/>
+            <rect id="mini-leg-r" x="52" y="85" width="10" height="30" rx="3" fill="#666" stroke="#333" stroke-width="2"/>
+        </svg>
+        <div class="ppe-items" id="ppe-items"></div>
+    </div>
+    
+    <!-- 时间信息 -->
+    <div class="info-badge">
+        <div class="info-item">
+            <span>⏰</span>
+            <span id="time">--:--:--</span>
+        </div>
+        <div class="info-item">
+            <span>📅</span>
+            <span id="date">----/--/--</span>
+        </div>
+    </div>
+    
+    <!-- 主状态显示 -->
+    <div class="status-overlay" id="status-overlay">
+        <div class="status-icon pulse" id="status-icon">👋</div>
+        <div class="status-text" id="status-text">GOOD MORNING</div>
+        <div class="status-message" id="status-msg">Please stand in front of camera</div>
+        <div class="progress-bar" id="progress-bar" style="display: none;">
+            <div class="progress-fill" id="progress-fill"></div>
+        </div>
+    </div>
+    
+    <script src="https://cdn.socket.io/4.5.4/socket.io.min.js"></script>
+    <script>
+        // 简化版检测更新
+        const socket = io();
+        let required = ['Head', 'Hands'];
+        let detected = [];
+        let lastAccessGranted = false;
+        let accessGrantedStartTime = null;  // 记录授权开始时间
+        let isInGrantedState = false;  // 是否处于授权状态
+        
+        // 获取问候语
+        function getGreeting() {
+            const hour = new Date().getHours();
+            if (hour < 12) return 'Good Morning';
+            if (hour < 18) return 'Good Afternoon';
+            return 'Good Evening';
+        }
+        
+        // TTS语音播报
+        function speak(text) {
+            if ('speechSynthesis' in window) {
+                const utterance = new SpeechSynthesisUtterance(text);
+                utterance.lang = 'en-US';
+                utterance.rate = 0.9;
+                utterance.pitch = 1.0;
+                speechSynthesis.speak(utterance);
+            }
+        }
+        
+        // 更新时间
+        function updateTime() {
+            const now = new Date();
+            document.getElementById('time').textContent = now.toLocaleTimeString('en-US', {hour12: false});
+            document.getElementById('date').textContent = now.toLocaleDateString('en-US');
+        }
+        updateTime();
+        setInterval(updateTime, 1000);
+        
+        // 初始化显示问候语
+        document.getElementById('status-text').textContent = getGreeting().toUpperCase();
+        
+        // 更新人体颜色（根据配置）
+        function updateBody(detectedClasses) {
+            const detectedLower = detectedClasses.map(c => c.toLowerCase());
+            const requiredLower = required.map(c => c.toLowerCase());
+            
+            // 检查头部相关
+            const headRequired = requiredLower.some(r => ['head', 'helmet', 'face-mask-medical'].includes(r));
+            const headDetected = detectedLower.some(d => ['head', 'helmet', 'face', 'face-mask-medical'].includes(d));
+            
+            // 检查手部相关
+            const handsRequired = requiredLower.some(r => ['hands', 'gloves'].includes(r));
+            const handsDetected = detectedLower.some(d => ['hands', 'gloves'].includes(d));
+            
+            // 根据是否需要和是否检测到来设置颜色
+            document.getElementById('mini-head').style.fill = 
+                headRequired ? (headDetected ? '#10B981' : '#EF4444') : '#666';
+            document.getElementById('mini-hand-l').style.fill = 
+                handsRequired ? (handsDetected ? '#10B981' : '#EF4444') : '#666';
+            document.getElementById('mini-hand-r').style.fill = 
+                handsRequired ? (handsDetected ? '#10B981' : '#EF4444') : '#666';
+            
+            document.getElementById('mini-body').style.fill = '#666';
+            document.getElementById('mini-leg-l').style.fill = '#666';
+            document.getElementById('mini-leg-r').style.fill = '#666';
+        }
+        
+        // 更新PPE列表
+        function updatePPEList(detectedClasses) {
+            const list = document.getElementById('ppe-items');
+            list.innerHTML = required.map(item => {
+                const isDetected = detectedClasses.some(c => c.toLowerCase() === item.toLowerCase());
+                return `<div class="ppe-mini-item ${isDetected ? 'detected' : 'missing'}">
+                    <span>${item}</span>
+                    <span>${isDetected ? '✓' : '✗'}</span>
+                </div>`;
+            }).join('');
+        }
+        
+        // 检查PPE是否完整
+        function checkPPEComplete(detectedClasses, requiredClasses) {
+            // 转换为小写进行比较
+            const detectedLower = detectedClasses.map(c => c.toLowerCase());
+            const requiredLower = requiredClasses.map(c => c.toLowerCase());
+            
+            // 检查所有必需的PPE是否都被检测到
+            return requiredLower.every(req => detectedLower.includes(req));
+        }
+        
+        // 获取缺失的PPE
+        function getMissingPPE(detectedClasses, requiredClasses) {
+            const detectedLower = detectedClasses.map(c => c.toLowerCase());
+            const requiredLower = requiredClasses.map(c => c.toLowerCase());
+            
+            return requiredClasses.filter((req, i) => !detectedLower.includes(requiredLower[i]));
+        }
+        
+        // WebSocket事件
+        socket.on('detection_update', (data) => {
+            detected = data.detected_classes || [];
+            updateBody(detected);
+            updatePPEList(detected);
+            
+            // 只更新检测状态，不自己判断是否放行
+            // 访问决策由后端的 access_status_change 事件控制
+            const missing = getMissingPPE(detected, required);
+            
+            console.log('🔍 Detection update:', {
+                detected: detected,
+                required: required,
+                missing: missing
+            });
+        });
+        
+        // 监听后端的访问控制决策（这才是真正的决策）
+        socket.on('access_status_change', (data) => {
+            console.log('🎯 Access status from backend:', data);
+            
+            const overlay = document.getElementById('status-overlay');
+            const icon = document.getElementById('status-icon');
+            const text = document.getElementById('status-text');
+            const msg = document.getElementById('status-msg');
+            const progressBar = document.getElementById('progress-bar');
+            const progressFill = document.getElementById('progress-fill');
+            
+            const state = data.state;
+            const missing = getMissingPPE(detected, required);
+            
+            if (state === 'ACCESS_GRANTED') {
+                // 授权！后端已批准
+                isInGrantedState = true;
+                overlay.className = 'status-overlay granted slide-up';
+                icon.textContent = '✅';
+                text.textContent = 'ACCESS GRANTED';
+                msg.textContent = data.person_name ? `Welcome ${data.person_name}!` : 'Welcome! Door opening...';
+                
+                // TTS 语音播报
+                const greeting = getGreeting();
+                speak(`${greeting}, Please come in`);
+                
+                // 显示进度条
+                progressBar.style.display = 'block';
+                progressFill.style.width = '0%';
+                setTimeout(() => {
+                    progressFill.style.width = '100%';
+                }, 100);
+                
+            } else if (state === 'ACCESS_DENIED') {
+                // 拒绝访问！后端已拒绝
+                isInGrantedState = false;
+                overlay.className = 'status-overlay denied shake';
+                icon.textContent = '❌';
+                text.textContent = 'ACCESS DENIED';
+                msg.textContent = data.message || 'Access not authorized';
+                progressBar.style.display = 'none';
+                
+            } else if (state === 'IDLE') {
+                // 空闲状态
+                isInGrantedState = false;
+                overlay.className = 'status-overlay';
+                icon.textContent = '👋';
+                text.textContent = getGreeting().toUpperCase();
+                msg.textContent = 'Please stand in front of camera';
+                progressBar.style.display = 'none';
+                
+            } else if (state === 'FACE_DETECTING') {
+                // 正在检测人脸
+                overlay.className = 'status-overlay checking';
+                icon.textContent = '👤';
+                text.textContent = 'DETECTING FACE';
+                msg.textContent = 'Please look at the camera...';
+                progressBar.style.display = 'none';
+                
+            } else if (state === 'PPE_CHECKING') {
+                // 正在检测 PPE
+                overlay.className = 'status-overlay checking';
+                icon.textContent = '🔍';
+                text.textContent = 'CHECKING PPE';
+                
+                if (missing.length > 0) {
+                    msg.textContent = `Missing: ${missing.join(', ')}`;
+                } else {
+                    msg.textContent = 'Verifying equipment...';
+                }
+                progressBar.style.display = 'none';
+            }
+        });
+        
+        socket.on('connect', () => {
+            console.log('✅ Connected to server');
+            socket.emit('request_config');
+            // 连接成功后启动检测
+            socket.emit('start_detection');
+            console.log('🎬 Starting detection...');
+        });
+        
+        socket.on('disconnect', () => {
+            console.log('❌ Disconnected from server');
+        });
+        
+        socket.on('config_update', (data) => {
+            required = data.required_classes || ['Head', 'Hands'];
+            console.log('✅ 配置更新:', required);
+        });
+        
+        socket.on('detection_started', (data) => {
+            console.log('✅ Detection started:', data);
+        });
+        
+        socket.on('detection_stopped', (data) => {
+            console.log('⏹️ Detection stopped:', data);
+        });
+        
+        // 页面加载时立即请求配置
+        setTimeout(() => {
+            socket.emit('request_config');
+        }, 500);
+        
+        // 页面即将关闭或离开时停止检测
+        window.addEventListener('beforeunload', function(event) {
+            console.log('📴 Page closing/leaving, stopping detection...');
+            socket.emit('stop_detection');
+        });
+        
+        // 页面卸载时也停止（备用）
+        window.addEventListener('unload', function() {
+            console.log('📴 Page unloaded, stopping detection...');
+            socket.emit('stop_detection');
+        });
+        
+        // 页面可见性变化时控制检测（切换标签页）
+        document.addEventListener('visibilitychange', function() {
+            if (document.hidden) {
+                console.log('👁️ Page hidden (tab switched), stopping detection...');
+                socket.emit('stop_detection');
+            } else {
+                console.log('👁️ Page visible (tab back), restarting detection...');
+                socket.emit('start_detection');
+            }
+        });
+        
+        // 页面失去焦点时停止检测（导航到其他页面）
+        window.addEventListener('pagehide', function() {
+            console.log('📴 Page hidden (navigation), stopping detection...');
+            socket.emit('stop_detection');
+        });
+    </script>
+</body>
+</html>
+

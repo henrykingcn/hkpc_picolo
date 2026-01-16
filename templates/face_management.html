@@ -1,0 +1,337 @@
+{% extends "base.html" %}
+
+{% block title %}Face Management - HKPC Admin{% endblock %}
+
+{% block content %}
+<div class="container admin-container">
+    <div class="admin-header">
+        <div>
+            <h1>Face Recognition Management</h1>
+            <p>Register, enable/disable, and delete authorized personnel</p>
+        </div>
+        <div style="display: flex; gap: 10px;">
+            <a href="/admin" class="btn btn-secondary">← Back to Admin</a>
+            <a href="/access" class="btn btn-primary" target="_blank">📹 View Access Panel</a>
+        </div>
+    </div>
+    
+    <div id="alert-container"></div>
+    
+    <!-- Add New Person -->
+    <div class="config-section">
+        <h2>Register New Person</h2>
+        <form id="register-form" enctype="multipart/form-data">
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-bottom: 1rem;">
+                <div>
+                    <label style="display: block; margin-bottom: 0.5rem; font-weight: 600;">Name</label>
+                    <input type="text" id="person-name" required 
+                           style="width: 100%; padding: 0.75rem; border: 1px solid #D1D5DB; border-radius: 0.5rem;">
+                </div>
+                <div>
+                    <label style="display: block; margin-bottom: 0.5rem; font-weight: 600;">Employee ID</label>
+                    <input type="text" id="employee-id" required 
+                           style="width: 100%; padding: 0.75rem; border: 1px solid #D1D5DB; border-radius: 0.5rem;">
+                </div>
+            </div>
+            
+            <div style="margin-bottom: 1rem;">
+                <label style="display: block; margin-bottom: 0.5rem; font-weight: 600;">Face Photo</label>
+                <input type="file" id="face-photo" accept="image/*" required
+                       style="width: 100%; padding: 0.75rem; border: 1px solid #D1D5DB; border-radius: 0.5rem;">
+                <p style="font-size: 0.875rem; color: #6B7280; margin-top: 0.5rem;">
+                    Upload a clear photo with single face, well-lit, front-facing
+                </p>
+            </div>
+            
+            <div id="preview-container" style="display: none; margin-bottom: 1rem; text-align: center;">
+                <img id="photo-preview" style="max-width: 300px; border-radius: 0.5rem; border: 2px solid #D1D5DB;">
+            </div>
+            
+            <button type="submit" class="btn btn-primary">
+                <span id="register-btn-text">Register Face</span>
+                <span id="register-spinner" style="display: none;">Processing...</span>
+            </button>
+        </form>
+    </div>
+    
+    <!-- Authorized Persons List -->
+    <div class="config-section">
+        <h2>Authorized Personnel</h2>
+        <div id="persons-list">
+            <p style="text-align: center; color: #6B7280;">Loading...</p>
+        </div>
+    </div>
+</div>
+
+<style>
+.person-card {
+    display: flex;
+    align-items: center;
+    gap: 1.5rem;
+    padding: 1.5rem;
+    background: #F9FAFB;
+    border-radius: 0.75rem;
+    margin-bottom: 1rem;
+    border: 2px solid transparent;
+    transition: all 0.3s;
+}
+
+.person-card:hover {
+    border-color: #003DA5;
+}
+
+.person-card.inactive {
+    opacity: 0.6;
+}
+
+.person-photo {
+    width: 80px;
+    height: 80px;
+    border-radius: 50%;
+    object-fit: cover;
+    border: 3px solid #003DA5;
+}
+
+.person-info {
+    flex: 1;
+}
+
+.person-name {
+    font-size: 1.25rem;
+    font-weight: 600;
+    color: #1F2937;
+    margin-bottom: 0.25rem;
+}
+
+.person-id {
+    font-size: 0.875rem;
+    color: #6B7280;
+    margin-bottom: 0.5rem;
+}
+
+.person-status {
+    display: inline-block;
+    padding: 0.25rem 0.75rem;
+    border-radius: 1rem;
+    font-size: 0.75rem;
+    font-weight: 600;
+}
+
+.person-status.active {
+    background: #D1FAE5;
+    color: #065F46;
+}
+
+.person-status.inactive {
+    background: #FEE2E2;
+    color: #991B1B;
+}
+
+.person-actions {
+    display: flex;
+    gap: 0.5rem;
+}
+
+.btn-small {
+    padding: 0.5rem 1rem;
+    border: none;
+    border-radius: 0.5rem;
+    font-size: 0.875rem;
+    cursor: pointer;
+    transition: all 0.3s;
+}
+
+.btn-toggle {
+    background: #F59E0B;
+    color: white;
+}
+
+.btn-toggle:hover {
+    background: #D97706;
+}
+
+.btn-delete {
+    background: #EF4444;
+    color: white;
+}
+
+.btn-delete:hover {
+    background: #DC2626;
+}
+</style>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+// Preview photo when selected
+document.getElementById('face-photo').addEventListener('change', function(e) {
+    const file = e.target.files[0];
+    if (file) {
+        const reader = new FileReader();
+        reader.onload = function(e) {
+            document.getElementById('photo-preview').src = e.target.result;
+            document.getElementById('preview-container').style.display = 'block';
+        };
+        reader.readAsDataURL(file);
+    }
+});
+
+// Register new person
+document.getElementById('register-form').addEventListener('submit', async function(e) {
+    e.preventDefault();
+    
+    const name = document.getElementById('person-name').value;
+    const employeeId = document.getElementById('employee-id').value;
+    const photo = document.getElementById('face-photo').files[0];
+    
+    if (!photo) {
+        showAlert('Please select a photo', 'error');
+        return;
+    }
+    
+    // Show loading
+    document.getElementById('register-btn-text').style.display = 'none';
+    document.getElementById('register-spinner').style.display = 'inline';
+    
+    const formData = new FormData();
+    formData.append('name', name);
+    formData.append('employee_id', employeeId);
+    formData.append('photo', photo);
+    
+    try {
+        const response = await fetch('/api/faces/register', {
+            method: 'POST',
+            body: formData
+        });
+        
+        const data = await response.json();
+        
+        if (data.success) {
+            showAlert(data.message, 'success');
+            // Reset form
+            document.getElementById('register-form').reset();
+            document.getElementById('preview-container').style.display = 'none';
+            // Reload persons list
+            loadPersons();
+        } else {
+            showAlert(data.message, 'error');
+        }
+    } catch (error) {
+        console.error('Error:', error);
+        showAlert('Error registering face', 'error');
+    } finally {
+        document.getElementById('register-btn-text').style.display = 'inline';
+        document.getElementById('register-spinner').style.display = 'none';
+    }
+});
+
+// Load persons list
+async function loadPersons() {
+    try {
+        const response = await fetch('/api/faces');
+        const data = await response.json();
+        
+        const personsList = document.getElementById('persons-list');
+        
+        if (data.persons.length === 0) {
+            personsList.innerHTML = '<p style="text-align: center; color: #6B7280;">No authorized personnel yet</p>';
+            return;
+        }
+        
+        personsList.innerHTML = data.persons.map(person => `
+            <div class="person-card ${person.is_active ? '' : 'inactive'}">
+                <img src="/static/images/faces/${person.photo_path}" 
+                     alt="${person.name}" 
+                     class="person-photo"
+                     onerror="this.src='/static/images/logo-hkpc.png'">
+                <div class="person-info">
+                    <div class="person-name">${person.name}</div>
+                    <div class="person-id">ID: ${person.employee_id}</div>
+                    <span class="person-status ${person.is_active ? 'active' : 'inactive'}">
+                        ${person.is_active ? 'Active' : 'Inactive'}
+                    </span>
+                </div>
+                <div class="person-actions">
+                    <button class="btn-small btn-toggle" onclick="togglePerson(${person.id}, ${!person.is_active})">
+                        ${person.is_active ? 'Disable' : 'Enable'}
+                    </button>
+                    <button class="btn-small btn-delete" onclick="deletePerson(${person.id}, '${person.name}')">
+                        Delete
+                    </button>
+                </div>
+            </div>
+        `).join('');
+        
+    } catch (error) {
+        console.error('Error loading persons:', error);
+        showAlert('Error loading persons list', 'error');
+    }
+}
+
+async function togglePerson(id, enable) {
+    try {
+        const response = await fetch(`/api/faces/${id}/status`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({ is_active: enable })
+        });
+        
+        const data = await response.json();
+        
+        if (data.success) {
+            showAlert(data.message, 'success');
+            loadPersons();
+        } else {
+            showAlert(data.message, 'error');
+        }
+    } catch (error) {
+        console.error('Error:', error);
+        showAlert('Error updating person status', 'error');
+    }
+}
+
+async function deletePerson(id, name) {
+    if (!confirm(`Are you sure you want to delete ${name}? This action cannot be undone.`)) {
+        return;
+    }
+    
+    try {
+        const response = await fetch(`/api/faces/${id}`, {
+            method: 'DELETE'
+        });
+        
+        const data = await response.json();
+        
+        if (data.success) {
+            showAlert(data.message, 'success');
+            loadPersons();
+        } else {
+            showAlert(data.message, 'error');
+        }
+    } catch (error) {
+        console.error('Error:', error);
+        showAlert('Error deleting person', 'error');
+    }
+}
+
+function showAlert(message, type) {
+    const alertContainer = document.getElementById('alert-container');
+    const alertDiv = document.createElement('div');
+    alertDiv.className = `alert alert-${type}`;
+    alertDiv.textContent = message;
+    
+    alertContainer.innerHTML = '';
+    alertContainer.appendChild(alertDiv);
+    
+    setTimeout(() => {
+        alertDiv.remove();
+    }, 5000);
+}
+
+// Load persons on page load
+loadPersons();
+</script>
+{% endblock %}
+

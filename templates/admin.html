@@ -1,0 +1,327 @@
+{% extends "base.html" %}
+
+{% block title %}Admin Panel - HKPC PPE Detection{% endblock %}
+
+{% block content %}
+<div class="container admin-container">
+    <div class="admin-header">
+        <div>
+            <h1>Access Control Configuration</h1>
+            <p>Configure PPE requirements, face recognition, and system settings</p>
+        </div>
+        <div style="display: flex; gap: 10px;">
+            <a href="/admin/faces" class="btn btn-primary">👤 Manage Faces</a>
+            <a href="/access" class="btn btn-primary" target="_blank">📹 View Access Panel</a>
+            <a href="/admin/logout" class="btn btn-secondary">🚪 Logout</a>
+        </div>
+    </div>
+    
+    <div id="alert-container"></div>
+    
+    <div class="config-section">
+        <h2>System Configuration</h2>
+        
+        <div class="face-recognition-toggle" style="margin-bottom: 20px; padding: 15px; background: #f5f5f5; border-radius: 8px;">
+            <label style="display: flex; align-items: center; gap: 10px; cursor: pointer;">
+                <input type="checkbox" id="face-recognition-enabled" onchange="toggleFaceRecognition(this.checked)" style="width: 20px; height: 20px;">
+                <div>
+                    <strong>Enable Face Recognition</strong>
+                    <div style="font-size: 0.9em; color: #666; margin-top: 5px;">
+                        When enabled, users must be recognized before PPE detection. When disabled, only PPE detection is performed.
+                    </div>
+                </div>
+            </label>
+            <div id="face-recognition-status" style="margin-top: 10px; font-size: 0.9em; color: #666;">
+                Loading...
+            </div>
+        </div>
+        
+        <h3>PPE Detection Configuration</h3>
+        
+        <div class="logic-selector">
+            <label for="detection-logic">Detection Logic:</label>
+            <select id="detection-logic">
+                <option value="ALL">Require ALL selected classes (AND logic)</option>
+                <option value="ANY">Require ANY selected class (OR logic)</option>
+            </select>
+        </div>
+        
+        <div class="class-grid" id="class-grid">
+            <!-- Classes will be loaded dynamically -->
+        </div>
+        
+        <div class="btn-group">
+            <button class="btn btn-primary" onclick="saveConfiguration()">Save Configuration</button>
+            <button class="btn btn-secondary" onclick="loadConfiguration()">Reset Changes</button>
+        </div>
+    </div>
+    
+    <div class="logs-section">
+        <h2>Detection Logs</h2>
+        
+        <div class="logs-controls">
+            <span id="log-count">Loading logs...</span>
+            <button class="btn btn-secondary" onclick="clearLogs()">Clear All Logs</button>
+        </div>
+        
+        <div style="overflow-x: auto;">
+            <table class="log-table">
+                <thead>
+                    <tr>
+                        <th>Timestamp</th>
+                        <th>Person Name</th>
+                        <th>Employee ID</th>
+                        <th>Detected Classes</th>
+                        <th>Access Status</th>
+                    </tr>
+                </thead>
+                <tbody id="logs-tbody">
+                    <tr>
+                        <td colspan="5" style="text-align: center; color: var(--text-gray);">Loading logs...</td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+let currentConfig = {};
+
+// Load configuration on page load
+document.addEventListener('DOMContentLoaded', function() {
+    loadConfiguration();
+    loadFaceRecognitionConfig();
+    loadLogs();
+    
+    // Refresh logs every 5 seconds
+    setInterval(loadLogs, 5000);
+});
+
+function loadConfiguration() {
+    fetch('/api/config')
+        .then(response => response.json())
+        .then(data => {
+            currentConfig = data;
+            
+            // Update detection logic selector
+            document.getElementById('detection-logic').value = data.detection_logic;
+            
+            // Render class checkboxes
+            const classGrid = document.getElementById('class-grid');
+            classGrid.innerHTML = '';
+            
+            data.classes.forEach(classConfig => {
+                const div = document.createElement('div');
+                div.className = 'class-item' + (classConfig.enabled ? ' enabled' : '');
+                
+                const checkbox = document.createElement('input');
+                checkbox.type = 'checkbox';
+                checkbox.id = 'class-' + classConfig.class_name;
+                checkbox.checked = classConfig.enabled;
+                checkbox.onchange = function() {
+                    div.classList.toggle('enabled', this.checked);
+                };
+                
+                const label = document.createElement('label');
+                label.htmlFor = 'class-' + classConfig.class_name;
+                label.textContent = classConfig.class_name;
+                
+                div.appendChild(checkbox);
+                div.appendChild(label);
+                classGrid.appendChild(div);
+            });
+        })
+        .catch(error => {
+            console.error('Error loading configuration:', error);
+            showAlert('Error loading configuration', 'error');
+        });
+}
+
+function saveConfiguration() {
+    // Collect enabled classes
+    const classes = currentConfig.classes.map(classConfig => {
+        const checkbox = document.getElementById('class-' + classConfig.class_name);
+        return {
+            class_name: classConfig.class_name,
+            enabled: checkbox.checked
+        };
+    });
+    
+    // Get detection logic
+    const detectionLogic = document.getElementById('detection-logic').value;
+    
+    // Send update to server
+    fetch('/api/config', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+            classes: classes,
+            detection_logic: detectionLogic
+        })
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            showAlert('Configuration saved successfully', 'success');
+            loadConfiguration();
+        } else {
+            showAlert('Error saving configuration: ' + data.message, 'error');
+        }
+    })
+    .catch(error => {
+        console.error('Error saving configuration:', error);
+        showAlert('Error saving configuration', 'error');
+    });
+}
+
+function loadLogs() {
+    fetch('/api/logs?limit=50')
+        .then(response => response.json())
+        .then(data => {
+            const tbody = document.getElementById('logs-tbody');
+            const logCount = document.getElementById('log-count');
+            
+            logCount.textContent = `Showing ${data.logs.length} most recent logs`;
+            
+            if (data.logs.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="5" style="text-align: center; color: var(--text-gray);">No logs yet</td></tr>';
+                return;
+            }
+            
+            tbody.innerHTML = '';
+            data.logs.forEach(log => {
+                const tr = document.createElement('tr');
+                
+                // Format timestamp
+                const timestamp = new Date(log.timestamp).toLocaleString();
+                
+                // Person name and employee ID
+                const personName = log.person_name || 'Unknown';
+                const employeeId = log.employee_id || '-';
+                
+                // Parse detected classes
+                const detectedClasses = JSON.parse(log.detected_classes);
+                const classesText = detectedClasses.length > 0 ? detectedClasses.join(', ') : 'None';
+                
+                // Access status badge
+                const accessBadge = log.access_granted 
+                    ? '<span class="access-badge granted">GRANTED</span>'
+                    : '<span class="access-badge denied">DENIED</span>';
+                
+                // Face match indicator
+                const faceIcon = log.face_matched ? '✓' : '';
+                const nameDisplay = faceIcon ? `${faceIcon} ${personName}` : personName;
+                
+                tr.innerHTML = `
+                    <td>${timestamp}</td>
+                    <td>${nameDisplay}</td>
+                    <td>${employeeId}</td>
+                    <td>${classesText}</td>
+                    <td>${accessBadge}</td>
+                `;
+                
+                tbody.appendChild(tr);
+            });
+        })
+        .catch(error => {
+            console.error('Error loading logs:', error);
+        });
+}
+
+function clearLogs() {
+    if (!confirm('Are you sure you want to clear all logs? This action cannot be undone.')) {
+        return;
+    }
+    
+    fetch('/api/logs/clear', {
+        method: 'POST'
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            showAlert('Logs cleared successfully', 'success');
+            loadLogs();
+        } else {
+            showAlert('Error clearing logs: ' + data.message, 'error');
+        }
+    })
+    .catch(error => {
+        console.error('Error clearing logs:', error);
+        showAlert('Error clearing logs', 'error');
+    });
+}
+
+function loadFaceRecognitionConfig() {
+    fetch('/api/config/face-recognition')
+        .then(response => response.json())
+        .then(data => {
+            const checkbox = document.getElementById('face-recognition-enabled');
+            const statusDiv = document.getElementById('face-recognition-status');
+            
+            checkbox.checked = data.enabled;
+            
+            if (!data.available) {
+                checkbox.disabled = true;
+                statusDiv.innerHTML = '<span style="color: #ff9800;">⚠️ Face recognition library not available. Please install insightface.</span>';
+            } else {
+                statusDiv.innerHTML = data.enabled 
+                    ? '<span style="color: #4caf50;">✓ Face recognition is enabled</span>'
+                    : '<span style="color: #666;">Face recognition is disabled - only PPE detection will be performed</span>';
+            }
+        })
+        .catch(error => {
+            console.error('Error loading face recognition config:', error);
+            document.getElementById('face-recognition-status').innerHTML = '<span style="color: #f44336;">Error loading configuration</span>';
+        });
+}
+
+function toggleFaceRecognition(enabled) {
+    const statusDiv = document.getElementById('face-recognition-status');
+    statusDiv.innerHTML = '<span style="color: #2196f3;">Updating...</span>';
+    
+    fetch('/api/config/face-recognition', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ enabled: enabled })
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            showAlert(data.message, 'success');
+            loadFaceRecognitionConfig();
+        } else {
+            showAlert('Error: ' + data.message, 'error');
+            loadFaceRecognitionConfig();
+        }
+    })
+    .catch(error => {
+        console.error('Error toggling face recognition:', error);
+        showAlert('Error updating face recognition setting', 'error');
+        loadFaceRecognitionConfig();
+    });
+}
+
+function showAlert(message, type) {
+    const alertContainer = document.getElementById('alert-container');
+    const alertDiv = document.createElement('div');
+    alertDiv.className = 'alert alert-' + type;
+    alertDiv.textContent = message;
+    
+    alertContainer.innerHTML = '';
+    alertContainer.appendChild(alertDiv);
+    
+    // Auto-dismiss after 5 seconds
+    setTimeout(() => {
+        alertDiv.remove();
+    }, 5000);
+}
+</script>
+{% endblock %}
+

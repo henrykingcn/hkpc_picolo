@@ -1,0 +1,340 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>HKPC Admin Login</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+            background: linear-gradient(135deg, #1e3c72 0%, #2a5298 100%);
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .login-container {
+            background: white;
+            padding: 40px;
+            border-radius: 20px;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+            max-width: 400px;
+            width: 90%;
+            text-align: center;
+        }
+
+        .logo {
+            width: 120px;
+            margin-bottom: 20px;
+        }
+
+        h1 {
+            color: #1e3c72;
+            font-size: 28px;
+            margin-bottom: 10px;
+        }
+
+        .subtitle {
+            color: #666;
+            margin-bottom: 30px;
+            font-size: 14px;
+        }
+
+        .pin-display {
+            background: #f5f5f5;
+            border: 2px solid #e0e0e0;
+            border-radius: 12px;
+            padding: 20px;
+            margin-bottom: 20px;
+            font-size: 32px;
+            letter-spacing: 10px;
+            font-weight: bold;
+            color: #333;
+            min-height: 60px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .pin-dots {
+            display: flex;
+            gap: 12px;
+            justify-content: center;
+        }
+
+        .pin-dot {
+            width: 16px;
+            height: 16px;
+            border-radius: 50%;
+            background: #ddd;
+            transition: all 0.2s;
+        }
+
+        .pin-dot.filled {
+            background: #1e3c72;
+            transform: scale(1.2);
+        }
+
+        .keypad {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 12px;
+            margin-bottom: 20px;
+        }
+
+        .key {
+            background: #f5f5f5;
+            border: none;
+            padding: 20px;
+            font-size: 24px;
+            font-weight: 600;
+            border-radius: 12px;
+            cursor: pointer;
+            transition: all 0.2s;
+            color: #333;
+        }
+
+        .key:hover {
+            background: #e8e8e8;
+            transform: scale(1.05);
+        }
+
+        .key:active {
+            transform: scale(0.95);
+        }
+
+        .key.clear {
+            background: #ff6b6b;
+            color: white;
+        }
+
+        .key.clear:hover {
+            background: #ff5252;
+        }
+
+        .key.enter {
+            background: #10B981;
+            color: white;
+            grid-column: span 2;
+        }
+
+        .key.enter:hover {
+            background: #059669;
+        }
+
+        .message {
+            padding: 12px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+            font-size: 14px;
+            display: none;
+        }
+
+        .message.error {
+            background: #fee;
+            color: #c00;
+            border: 1px solid #fcc;
+            display: block;
+        }
+
+        .message.success {
+            background: #efe;
+            color: #0a0;
+            border: 1px solid #cfc;
+            display: block;
+        }
+
+        .lock-message {
+            background: #ff6b6b;
+            color: white;
+            padding: 15px;
+            border-radius: 10px;
+            margin-bottom: 20px;
+            display: none;
+        }
+
+        .lock-message.active {
+            display: block;
+        }
+
+        .hint {
+            color: #999;
+            font-size: 12px;
+            margin-top: 20px;
+        }
+
+        @keyframes shake {
+            0%, 100% { transform: translateX(0); }
+            25% { transform: translateX(-10px); }
+            75% { transform: translateX(10px); }
+        }
+
+        .shake {
+            animation: shake 0.5s;
+        }
+    </style>
+</head>
+<body>
+    <div class="login-container">
+        <img src="{{ url_for('static', filename='images/logo-hkpc.png') }}" alt="HKPC" class="logo">
+        <h1>Admin Access</h1>
+        <p class="subtitle">Enter your PIN code to continue</p>
+        
+        <div class="lock-message" id="lock-message">
+            🔒 Too many failed attempts. Please try again later.
+        </div>
+        
+        <div class="message" id="message"></div>
+        
+        <div class="pin-display" id="pin-display">
+            <div class="pin-dots">
+                <div class="pin-dot" id="dot1"></div>
+                <div class="pin-dot" id="dot2"></div>
+                <div class="pin-dot" id="dot3"></div>
+                <div class="pin-dot" id="dot4"></div>
+                <div class="pin-dot" id="dot5"></div>
+                <div class="pin-dot" id="dot6"></div>
+            </div>
+        </div>
+        
+        <div class="keypad">
+            <button class="key" onclick="addDigit('1')">1</button>
+            <button class="key" onclick="addDigit('2')">2</button>
+            <button class="key" onclick="addDigit('3')">3</button>
+            <button class="key" onclick="addDigit('4')">4</button>
+            <button class="key" onclick="addDigit('5')">5</button>
+            <button class="key" onclick="addDigit('6')">6</button>
+            <button class="key" onclick="addDigit('7')">7</button>
+            <button class="key" onclick="addDigit('8')">8</button>
+            <button class="key" onclick="addDigit('9')">9</button>
+            <button class="key clear" onclick="clearPin()">✕</button>
+            <button class="key" onclick="addDigit('0')">0</button>
+            <button class="key enter" onclick="submitPin()">✓ Enter</button>
+        </div>
+        
+        <div class="hint">
+            Default PIN: <strong>123456</strong> (Please change after first login)
+        </div>
+    </div>
+
+    <script>
+        let pin = '';
+        const maxLength = 6;
+
+        // Check lock status on page load
+        checkLockStatus();
+
+        function checkLockStatus() {
+            fetch('/api/auth/lock-status')
+                .then(res => res.json())
+                .then(data => {
+                    if (data.locked) {
+                        document.getElementById('lock-message').classList.add('active');
+                        document.querySelectorAll('.key').forEach(key => key.disabled = true);
+                    }
+                });
+        }
+
+        function updateDisplay() {
+            for (let i = 1; i <= 6; i++) {
+                const dot = document.getElementById(`dot${i}`);
+                if (i <= pin.length) {
+                    dot.classList.add('filled');
+                } else {
+                    dot.classList.remove('filled');
+                }
+            }
+        }
+
+        function addDigit(digit) {
+            if (pin.length < maxLength) {
+                pin += digit;
+                updateDisplay();
+                
+                // Auto-submit when 6 digits entered
+                if (pin.length === maxLength) {
+                    setTimeout(() => submitPin(), 300);
+                }
+            }
+        }
+
+        function clearPin() {
+            pin = '';
+            updateDisplay();
+            hideMessage();
+        }
+
+        function showMessage(text, type) {
+            const msg = document.getElementById('message');
+            msg.textContent = text;
+            msg.className = 'message ' + type;
+            
+            if (type === 'error') {
+                document.getElementById('pin-display').classList.add('shake');
+                setTimeout(() => {
+                    document.getElementById('pin-display').classList.remove('shake');
+                }, 500);
+            }
+        }
+
+        function hideMessage() {
+            document.getElementById('message').className = 'message';
+        }
+
+        function submitPin() {
+            if (pin.length < 4) {
+                showMessage('PIN must be at least 4 digits', 'error');
+                return;
+            }
+
+            fetch('/api/auth/pin', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({ pin: pin })
+            })
+            .then(res => res.json())
+            .then(data => {
+                if (data.success) {
+                    showMessage('✓ Access granted!', 'success');
+                    setTimeout(() => {
+                        window.location.href = '/admin';
+                    }, 500);
+                } else {
+                    showMessage(data.message, 'error');
+                    clearPin();
+                    
+                    // Check if account is now locked
+                    if (data.message.includes('locked')) {
+                        document.getElementById('lock-message').classList.add('active');
+                        document.querySelectorAll('.key').forEach(key => key.disabled = true);
+                    }
+                }
+            })
+            .catch(err => {
+                showMessage('Connection error', 'error');
+                clearPin();
+            });
+        }
+
+        // Keyboard support
+        document.addEventListener('keydown', (e) => {
+            if (e.key >= '0' && e.key <= '9') {
+                addDigit(e.key);
+            } else if (e.key === 'Enter') {
+                submitPin();
+            } else if (e.key === 'Backspace' || e.key === 'Escape') {
+                clearPin();
+            }
+        });
+    </script>
+</body>
+</html>

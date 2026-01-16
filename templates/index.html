@@ -1,0 +1,91 @@
+{% extends "base.html" %}
+
+{% block title %}PPE Detection - HKPC Access Control{% endblock %}
+
+{% block content %}
+<div class="container">
+    <div class="detection-container">
+        <div class="video-section">
+            <h1>PPE Detection Access Control</h1>
+            <div class="video-wrapper">
+                <img id="video-stream" src="{{ url_for('video_feed') }}" alt="Live Video Feed">
+            </div>
+        </div>
+        
+        <div class="status-section">
+            <div class="access-status denied" id="access-status">
+                <div class="status-icon" id="status-icon">🔒</div>
+                <div class="status-text" id="status-text">ACCESS DENIED</div>
+                <div class="status-message" id="status-message">Required PPE not detected</div>
+            </div>
+            
+            <div class="detection-info">
+                <h2>Detected Items</h2>
+                <ul class="detected-list" id="detected-list">
+                    <li class="no-detections">No items detected yet...</li>
+                </ul>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+// Update status every 500ms
+function updateStatus() {
+    fetch('/api/status')
+        .then(response => response.json())
+        .then(data => {
+            const statusDiv = document.getElementById('access-status');
+            const statusIcon = document.getElementById('status-icon');
+            const statusText = document.getElementById('status-text');
+            const statusMessage = document.getElementById('status-message');
+            const detectedList = document.getElementById('detected-list');
+            
+            // Update access status
+            if (data.access_granted) {
+                statusDiv.className = 'access-status granted';
+                statusIcon.textContent = '✓';
+                statusText.textContent = 'ACCESS GRANTED';
+                statusMessage.textContent = 'All required PPE detected';
+            } else {
+                statusDiv.className = 'access-status denied';
+                statusIcon.textContent = '🔒';
+                statusText.textContent = 'ACCESS DENIED';
+                statusMessage.textContent = 'Required PPE not detected';
+            }
+            
+            // Update detected items list
+            if (data.detected_classes && data.detected_classes.length > 0) {
+                detectedList.innerHTML = '';
+                data.detected_classes.forEach(className => {
+                    const li = document.createElement('li');
+                    li.className = 'detected-item';
+                    
+                    const confidence = data.confidence_scores[className];
+                    const confidencePercent = (confidence * 100).toFixed(1);
+                    
+                    li.innerHTML = `
+                        <span class="class-name">${className}</span>
+                        <span class="confidence">${confidencePercent}%</span>
+                    `;
+                    detectedList.appendChild(li);
+                });
+            } else {
+                detectedList.innerHTML = '<li class="no-detections">No items detected</li>';
+            }
+        })
+        .catch(error => {
+            console.error('Error fetching status:', error);
+        });
+}
+
+// Update status immediately and then every 500ms
+updateStatus();
+setInterval(updateStatus, 500);
+</script>
+{% endblock %}
+
+
+

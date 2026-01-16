@@ -1,0 +1,18 @@
+Flask==3.0.0
+Flask-SQLAlchemy==3.1.1
+Flask-SocketIO==5.3.5
+python-socketio==5.10.0
+opencv-python==4.8.1.78
+ultralytics==8.1.0
+bcrypt==4.1.2
+Pillow==10.1.0
+numpy==1.24.3
+
+# Face Recognition (InsightFace)
+# Option 1: Try without version (may get prebuilt wheel)
+insightface
+# Option 2: For Apple Silicon Mac, use:
+# onnxruntime-silicon
+# For Intel Mac or other platforms:
+onnxruntime
+

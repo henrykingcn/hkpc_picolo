@@ -1,0 +1,99 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Access Control - HKPC</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/portrait.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/animations.css') }}">
+</head>
+<body class="access-control-page">
+    <!-- Top Branding -->
+    <div class="brand-header">
+        <img src="{{ url_for('static', filename='images/logo-hkpc.png') }}" alt="HKPC">
+        <h1>PPE Detection Access Control System</h1>
+    </div>
+    
+    <!-- Small Video Preview -->
+    <div class="video-preview">
+        <img id="video-stream" src="{{ url_for('video_feed') }}" alt="Video Stream">
+        <div class="video-overlay" id="face-status">
+            Detecting...
+        </div>
+    </div>
+    
+    <!-- Main Body Visualization -->
+    <div class="body-visualization-section">
+        <div class="body-icon-container" id="body-icon-container">
+            <!-- SVG will be loaded here -->
+        </div>
+        
+        <div class="ppe-status-list">
+            <div class="ppe-status-title">PPE Detection Status</div>
+            <div id="ppe-items-list">
+                <!-- PPE items will be populated dynamically -->
+            </div>
+        </div>
+    </div>
+    
+    <!-- Access Status -->
+    <div class="access-status-section checking" id="access-status">
+        <div class="access-status-icon" id="status-icon">🔍</div>
+        <div class="access-status-text" id="status-text">CHECKING...</div>
+        <div class="access-status-message" id="status-message">Please stand in front of camera</div>
+        <div class="access-status-user" id="status-user" style="display: none;"></div>
+        <div class="door-progress" id="door-progress" style="display: none;">
+            <div class="door-progress-bar" id="door-progress-bar" style="width: 0%;"></div>
+        </div>
+    </div>
+    
+    <!-- Footer Info -->
+    <div class="info-footer">
+        <div class="info-item">
+            <span>⏰</span>
+            <span id="current-time">--:--:--</span>
+        </div>
+        <div class="info-item">
+            <span>📅</span>
+            <span id="current-date">----/--/--</span>
+        </div>
+        <div class="info-item">
+            <span id="system-status">● System Active</span>
+        </div>
+    </div>
+    
+    <script src="https://cdn.socket.io/4.5.4/socket.io.min.js"></script>
+    <script src="{{ url_for('static', filename='js/body_visualization.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/animations.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/websocket_handler.js') }}"></script>
+    
+    <script>
+        // Update time and date
+        function updateDateTime() {
+            const now = new Date();
+            document.getElementById('current-time').textContent = now.toLocaleTimeString('en-US', { hour12: false });
+            document.getElementById('current-date').textContent = now.toLocaleDateString('en-US');
+        }
+        
+        updateDateTime();
+        setInterval(updateDateTime, 1000);
+        
+        // Load SVG body icon
+        fetch('/static/images/body_icon.svg')
+            .then(response => response.text())
+            .then(svg => {
+                document.getElementById('body-icon-container').innerHTML = svg;
+                // Initialize body visualization after SVG is loaded
+                if (typeof initBodyVisualization === 'function') {
+                    initBodyVisualization();
+                }
+            })
+            .catch(error => {
+                console.error('Error loading body icon:', error);
+            });
+    </script>
+</body>
+</html>
+
+
+
